@@ -179,7 +179,7 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
           className={`fixed z-[500] ${
             fullscreen 
               ? 'inset-2 md:inset-4' 
-              : 'bottom-[70px] left-2 right-2 md:bottom-6 md:right-6 md:left-auto md:w-[480px]'
+              : 'bottom-[74px] left-1.5 right-1.5 md:bottom-6 md:right-6 md:left-auto md:w-[520px]'
           }`}
         >
           <div className="overflow-hidden h-full flex flex-col bg-black/85 backdrop-blur-xl border border-[var(--border-primary)]" style={{ boxShadow: '0 20px 50px rgba(0,0,0,0.9), inset 0 0 30px rgba(0,0,0,0.8)' }}>
@@ -200,7 +200,7 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
                 </div>
                 <div className="flex items-center gap-3">
                   <span>{currentTime}</span>
-                  <span className="text-[var(--gold-primary)]">SECURE UPLINK</span>
+                  <span className="text-[var(--gold-primary)]">LIAISON CAMÉRA</span>
                 </div>
               </div>
 
@@ -214,7 +214,7 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
                   </div>
                   <div className="min-w-0 flex-1">
                     <h3 className="text-[11px] md:text-[12px] font-mono font-bold tracking-widest truncate text-white uppercase" style={{ textShadow: '0 0 10px rgba(255,255,255,0.3)' }}>{camera.name}</h3>
-                    <p className="text-[9px] md:text-[9px] font-mono text-[var(--gold-primary)] uppercase tracking-wider opacity-80">{camera.city}, {camera.country} • SOURCE: {camera.source}</p>
+                    <p className="text-[9px] md:text-[9px] font-mono text-[var(--gold-primary)] uppercase tracking-wider opacity-80">{camera.city}, {camera.country} • SOURCE : {camera.source}</p>
                   </div>
                 </div>
                 
@@ -229,17 +229,17 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
                           setImageUrl(url);
                         }
                       }} 
-                      className="p-1.5 rounded-sm bg-white/5 border border-white/10 hover:bg-[var(--gold-primary)]/20 hover:border-[var(--gold-primary)] transition-all" title="Refresh feed"
+                      className="p-1.5 rounded-sm bg-white/5 border border-white/10 hover:bg-[var(--gold-primary)]/20 hover:border-[var(--gold-primary)] transition-all" title="Actualiser le flux"
                     >
                       <RefreshCw className="w-3 h-3 text-[var(--text-secondary)] hover:text-[var(--gold-primary)]" />
                     </button>
                   )}
                   {camera.lat && camera.lng && (
-                    <button onClick={() => onLocate?.(camera.lat, camera.lng)} className="p-1.5 rounded-sm bg-white/5 border border-white/10 hover:bg-[var(--gold-primary)]/20 hover:border-[var(--gold-primary)] transition-all" title="Fly to location">
+                    <button onClick={() => onLocate?.(camera.lat, camera.lng)} className="p-1.5 rounded-sm bg-white/5 border border-white/10 hover:bg-[var(--gold-primary)]/20 hover:border-[var(--gold-primary)] transition-all" title="Voir sur la carte">
                       <MapPin className="w-3 h-3 text-[var(--text-secondary)] hover:text-[var(--gold-primary)]" />
                     </button>
                   )}
-                  <button onClick={() => setFullscreen(!fullscreen)} className="hidden md:block p-1.5 rounded-sm bg-white/5 border border-white/10 hover:bg-[var(--text-primary)]/20 hover:border-[var(--text-primary)] transition-all" title="Toggle fullscreen">
+                  <button onClick={() => setFullscreen(!fullscreen)} className="block p-1.5 rounded-sm bg-white/5 border border-white/10 hover:bg-[var(--text-primary)]/20 hover:border-[var(--text-primary)] transition-all" title="Plein écran">
                     <Maximize2 className="w-3 h-3 text-[var(--text-secondary)] hover:text-[var(--text-primary)]" />
                   </button>
                   <button onClick={onClose} className="p-1.5 rounded-sm bg-red-900/30 border border-red-500/30 hover:bg-red-500/30 hover:border-red-500 transition-all ml-2">
@@ -250,7 +250,7 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
             </div>
 
           {/* Camera Feed */}
-          <div className={`relative bg-[#020202] ${fullscreen ? 'flex-1 overflow-hidden' : 'aspect-video max-h-[35vh] md:max-h-none'}`}>
+          <div className={`relative bg-[#020202] ${fullscreen ? 'flex-1 overflow-hidden' : 'aspect-video max-h-[44vh] md:max-h-none'}`}>
             {/* Tactical CRT Overlay */}
             <div className="absolute inset-0 pointer-events-none z-20" style={{
               backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(255,255,255,0.02) 2px, rgba(255,255,255,0.02) 2px)',
@@ -262,7 +262,7 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
               <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-30 backdrop-blur-sm">
                 <div className="text-center">
                   <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-3" style={{ borderColor: 'var(--gold-dim)', borderTopColor: 'transparent' }} />
-                  <span className="text-[10px] font-mono tracking-[0.25em]" style={{ color: 'var(--gold-primary)' }}>DECRYPTING FEED...</span>
+                  <span className="text-[10px] font-mono tracking-[0.25em]" style={{ color: 'var(--gold-primary)' }}>CHARGEMENT DU FLUX...</span>
                 </div>
               </div>
             )}
@@ -270,14 +270,14 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
             {view === 'resolving' ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-30 backdrop-blur-sm p-4 text-center">
                 <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin mb-3" style={{ borderColor: 'var(--gold-dim)', borderTopColor: 'transparent' }} />
-                <p className="text-[11px] font-mono uppercase tracking-widest" style={{ color: 'var(--gold-primary)' }}>ACQUIRING UPLINK</p>
-                <p className="text-[9px] font-mono text-[var(--text-muted)] mt-2 uppercase">Locating a direct feed</p>
+                <p className="text-[11px] font-mono uppercase tracking-widest" style={{ color: 'var(--gold-primary)' }}>RECHERCHE DU FLUX</p>
+                <p className="text-[9px] font-mono text-[var(--text-muted)] mt-2 uppercase">Recherche d’un flux direct</p>
               </div>
             ) : view === 'offline' ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-30 backdrop-blur-sm p-4 text-center">
                 <CameraOff className="w-6 h-6 mb-3 opacity-50 text-[var(--text-muted)]" />
                 <p className="text-[11px] font-mono uppercase tracking-widest text-[var(--text-secondary)]">{gone ? 'CAMÉRA RETIRÉE' : 'CAMÉRA HORS LIGNE'}</p>
-                <p className="text-[9px] font-mono text-[var(--text-muted)] mt-2 max-w-[80%] uppercase">{gone ? 'No longer published at source' : 'The operator has this feed off air'}</p>
+                <p className="text-[9px] font-mono text-[var(--text-muted)] mt-2 max-w-[80%] uppercase">{gone ? 'Cette caméra n’est plus publiée' : 'Le flux est actuellement hors ligne'}</p>
                 {/* No ACCESS TERMINAL button: the page it would open is either
                     showing the same 'offline' banner we just read, or a 404. */}
               </div>

@@ -53,7 +53,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     fullLabel: 'ŒIL DE DIEU SDK',
     icon: Network,
     layers: [
-      { key: 'sdk_sea', label: 'Maritime Lines', dataKey: 'sdk_entities' },
+      { key: 'sdk_sea', label: 'Lignes maritimes', dataKey: 'sdk_entities' },
     ],
   },
   {
@@ -62,9 +62,9 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     icon: Plane,
     layers: [
       { key: 'flights', label: 'Commercial', dataKey: 'commercial_flights' },
-      { key: 'private', label: 'Private', dataKey: 'private_flights' },
-      { key: 'jets', label: 'Private Jets', dataKey: 'private_jets' },
-      { key: 'military', label: 'Military', dataKey: 'military_flights' },
+      { key: 'private', label: 'Privé', dataKey: 'private_flights' },
+      { key: 'jets', label: 'Jets privés', dataKey: 'private_jets' },
+      { key: 'military', label: 'Militaire', dataKey: 'military_flights' },
     ],
   },
   {
@@ -77,15 +77,15 @@ const LAYER_GROUPS: LayerGroupDef[] = [
   },
   {
     label: 'SPACE',
-    fullLabel: 'SPACE TRACKING',
+    fullLabel: 'SUIVI SPATIAL',
     icon: Satellite,
     layers: [
-      { key: 'satellites', label: 'All Satellites', dataKey: 'satellites' },
+      { key: 'satellites', label: 'Tous les satellites', dataKey: 'satellites' },
       { key: 'sat_comms', label: 'Starlink / Comms', dataKey: 'satellites', catKey: 'comms' },
-      { key: 'sat_military', label: 'Military / Intel', dataKey: 'satellites', catKey: 'military' },
+      { key: 'sat_military', label: 'Militaire / renseignement', dataKey: 'satellites', catKey: 'military' },
       { key: 'sat_navigation', label: 'GPS / Navigation', dataKey: 'satellites', catKey: 'navigation' },
-      { key: 'sat_earth', label: 'Earth Observation', dataKey: 'satellites', catKey: 'earth_obs' },
-      { key: 'sat_science', label: 'Stations / Telescopes', dataKey: 'satellites', catKey: 'science' },
+      { key: 'sat_earth', label: 'Observation terrestre', dataKey: 'satellites', catKey: 'earth_obs' },
+      { key: 'sat_science', label: 'Stations / télescopes', dataKey: 'satellites', catKey: 'science' },
     ],
   },
   {
@@ -93,38 +93,38 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     fullLabel: 'SURVEILLANCE',
     icon: Camera,
     layers: [
-      { key: 'cctv', label: 'CCTV Cameras', dataKey: 'cameras' },
-      { key: 'cctv_previews', label: 'Live Previews', dataKey: '', parent: 'cctv' },
-      { key: 'live_news', label: 'Live News Feeds', dataKey: 'live_feeds' },
+      { key: 'cctv', label: 'Caméras publiques', dataKey: 'cameras' },
+      { key: 'cctv_previews', label: 'Aperçus en direct', dataKey: '', parent: 'cctv' },
+      { key: 'live_news', label: 'Actualités en direct', dataKey: 'live_feeds' },
     ],
   },
   {
     label: 'HAZARD',
-    fullLabel: 'NATURAL HAZARDS',
+    fullLabel: 'RISQUES NATURELS',
     icon: CloudLightning,
     layers: [
-      { key: 'earthquakes', label: 'Earthquakes', dataKey: 'earthquakes' },
-      { key: 'fires', label: 'Active Fires', dataKey: 'fires' },
-      { key: 'weather', label: 'Severe Weather', dataKey: 'weather_events' },
+      { key: 'earthquakes', label: 'Séismes', dataKey: 'earthquakes' },
+      { key: 'fires', label: 'Incendies actifs', dataKey: 'fires' },
+      { key: 'weather', label: 'Météo sévère', dataKey: 'weather_events' },
     ],
   },
   {
     label: 'THREAT',
-    fullLabel: 'THREATS & INTEL',
+    fullLabel: 'MENACES & RENSEIGNEMENT',
     icon: AlertTriangle,
     layers: [
-      { key: 'infrastructure', label: 'Nuclear Facilities', dataKey: 'infrastructure' },
-      { key: 'global_incidents', label: 'Global Incidents', dataKey: 'gdelt' },
+      { key: 'infrastructure', label: 'Installations nucléaires', dataKey: 'infrastructure' },
+      { key: 'global_incidents', label: 'Incidents mondiaux', dataKey: 'gdelt' },
       { key: 'gdelt_events', label: 'GDELT Events', dataKey: 'gdelt_events' },
     ],
   },
   {
     label: 'NETWORK',
-    fullLabel: 'NETWORK INTEL',
+    fullLabel: 'RENSEIGNEMENT RÉSEAU',
     icon: Network,
     layers: [
-      { key: 'malware', label: 'Live Malware', dataKey: 'malware_threats' },
-      { key: 'cyber_attacks', label: 'Live Attacks', dataKey: 'cyber_attacks' },
+      { key: 'malware', label: 'Malwares actifs', dataKey: 'malware_threats' },
+      { key: 'cyber_attacks', label: 'Attaques en direct', dataKey: 'cyber_attacks' },
     ],
   },
   {
@@ -132,18 +132,18 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     fullLabel: 'NET & EVENT INTEL',
     icon: Megaphone,
     layers: [
-      { key: 'cf_outages', label: 'Internet Outages', dataKey: 'cf_outages', requires: 'cloudflare' },
-      { key: 'cf_attacks', label: 'Attack Origins', dataKey: 'cf_attack_origins', requires: 'cloudflare' },
+      { key: 'cf_outages', label: 'Pannes Internet', dataKey: 'cf_outages', requires: 'cloudflare' },
+      { key: 'cf_attacks', label: 'Origines des attaques', dataKey: 'cf_attack_origins', requires: 'cloudflare' },
     ],
   },
   {
     label: 'DISPLAY',
-    fullLabel: 'DISPLAY',
+    fullLabel: 'AFFICHAGE',
     icon: Sun,
     layers: [
-      { key: 'day_night', label: 'Day / Night Cycle', dataKey: '' },
-      { key: 'terrain_3d', label: '3D Buildings', description: 'City detail · zoom 14.5+', dataKey: '' },
-      { key: 'terrain_elevation', label: '3D Terrain', description: 'Mountains · zoom 10+', dataKey: '' },
+      { key: 'day_night', label: 'Cycle jour / nuit', dataKey: '' },
+      { key: 'terrain_3d', label: 'Bâtiments 3D', description: 'City detail · zoom 14.5+', dataKey: '' },
+      { key: 'terrain_elevation', label: 'Terrain 3D', description: 'Mountains · zoom 10+', dataKey: '' },
     ],
   },
 ];
@@ -305,7 +305,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
 
         {/* MOBILE STYLE STUDIO */}
         <div className="flex items-center justify-between mt-2 pt-3 border-t border-white/[0.06] px-1">
-          <span className="text-[10px] font-mono tracking-[0.2em] text-white/25 uppercase">Style Studio</span>
+          <span className="text-[10px] font-mono tracking-[0.2em] text-white/25 uppercase">Studio visuel</span>
           <button
             onClick={() => setStudioOpen(o => !o)}
             aria-pressed={studioOpen}
@@ -501,13 +501,13 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
       {/* Subtle separator */}
       <div className="w-5 h-px bg-white/[0.06] my-2" />
 
-      {/* Style Studio */}
+      {/* Studio visuel */}
       <button
         onClick={() => setStudioOpen(o => !o)}
         aria-pressed={studioOpen}
         className="w-10 h-10 flex items-center justify-center rounded-lg transition-all duration-500 cursor-pointer"
         style={{ background: studioOpen ? 'var(--hover-accent)' : 'transparent' }}
-        title="Style Studio"
+        title="Studio visuel"
       >
         <SlidersHorizontal
           className="transition-all duration-500"

@@ -2489,3 +2489,19 @@ input[type="range"]::-moz-range-thumb {
   border-radius: 4px;
   padding: 1px 5px;
 }
+
+
+/* OEIL-DE-DIEU-V2-MOBILE */
+@media (max-width: 767px) {
+  .oeil-de-dieu-title {
+    max-width: calc(100vw - 150px);
+    overflow: visible;
+    line-height: 1.15;
+  }
+  .oeil-de-dieu-subtitle {
+    max-width: calc(100vw - 150px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  button, a { -webkit-tap-highlight-color: transparent; }
+}
