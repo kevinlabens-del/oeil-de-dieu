@@ -1,60 +1,49 @@
 {
-  "name": "gods-eye-view",
+  "name": "oeil-de-dieu",
+  "version": "1.0.0",
   "private": true,
-  "version": "0.1.0",
-  "description": "A real-time intelligence console for planet Earth — photorealistic 3D globe, live aircraft/ships/satellites/earthquakes/CCTV, and hands-free voice control. Runs in a browser.",
-  "type": "module",
-  "license": "MIT",
-  "author": "Bilawal Sidhu",
-  "homepage": "https://github.com/bilawalsidhu/gods-eye-view#readme",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/bilawalsidhu/gods-eye-view.git"
-  },
-  "bugs": {
-    "url": "https://github.com/bilawalsidhu/gods-eye-view/issues"
-  },
-  "engines": {
-    "node": ">=24.14.0 <25 || >=26 <27"
-  },
-  "keywords": [
-    "cesium",
-    "3d-globe",
-    "geospatial",
-    "osint",
-    "spatial-intelligence",
-    "photorealistic-3d-tiles",
-    "adsb",
-    "ais",
-    "satellites",
-    "voice-control",
-    "openai-realtime",
-    "visualization"
-  ],
   "scripts": {
-    "doctor": "node scripts/setup-doctor.mjs",
-    "dev": "vite",
-    "dev:secure": "./scripts/dev-secure.sh",
-    "opensky:import": "./scripts/opensky-import-client.sh",
-    "build": "vite build",
-    "preview": "vite preview",
-    "test": "node scripts/run-unit-tests.mjs",
-    "test:track": "node scripts/track-regression.mjs",
-    "qa:map-source-tray": "node scripts/qa-map-source-tray.mjs"
+    "predev": "node tools/prepare-map-worker.mjs",
+    "dev": "next dev",
+    "prebuild": "node tools/prepare-map-worker.mjs",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:live": "RUN_LIVE_TESTS=1 vitest run"
   },
   "dependencies": {
-    "@mapbox/vector-tile": "^3.0.0",
-    "cesium": "^1.124.0",
-    "egm96-universal": "^1.1.1",
-    "mgrs": "^2.1.0",
-    "pbf": "^5.1.2",
-    "satellite.js": "^6.0.2"
+    "@google/generative-ai": "^0.24.1",
+    "@vercel/analytics": "^2.0.1",
+    "framer-motion": "^12.38.0",
+    "google-libphonenumber": "^3.2.44",
+    "hls.js": "^1.6.16",
+    "lightweight-charts": "^5.2.0",
+    "lucide-react": "^1.14.0",
+    "maplibre-gl": "6.7.0",
+    "next": "16.3.4",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-force-graph-2d": "^1.29.1",
+    "react-map-gl": "^8.1.1",
+    "rss-parser": "^3.13.0",
+    "satellite.js": "^7.0.0",
+    "sharp": "^0.35.4",
+    "ws": "^8.21.0"
   },
   "devDependencies": {
-    "puppeteer": "^24.37.5",
-    "sharp": "^0.34.5",
-    "vite": "^6.0.0",
-    "vite-plugin-cesium": "^1.2.23",
-    "ws": "^8.21.0"
+    "@tailwindcss/postcss": "^4",
+    "@types/google-libphonenumber": "^7.4.30",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/web-bluetooth": "^0.0.21",
+    "@types/ws": "^8.18.1",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.4",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vitest": "^2.1.9"
   }
 }
