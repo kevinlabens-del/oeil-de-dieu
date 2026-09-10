@@ -2,6 +2,9 @@
   "name": "oeil-de-dieu",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "predev": "node tools/prepare-map-worker.mjs",
     "dev": "next dev",
