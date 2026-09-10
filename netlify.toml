@@ -1,3 +1,4 @@
+# Netlify configuration for Œil de Dieu (Next.js)
 [build]
   command = "npm run build"
   publish = ".next"
