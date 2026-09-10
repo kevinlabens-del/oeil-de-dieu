@@ -1,0 +1,151 @@
+name: Bootstrap Oeil de Dieu V1
+
+on:
+  push:
+    paths:
+      - '.github/workflows/bootstrap-oeil-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout current repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Replace legacy app with OSIRIS base
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .github/workflows/bootstrap-oeil-v1.yml /tmp/bootstrap-oeil-v1.yml
+          TMP_DIR="$(mktemp -d)"
+          curl -L --fail --retry 3 -o "$TMP_DIR/osiris.zip" https://github.com/simplifaisoul/osiris/archive/refs/heads/master.zip
+          python - "$TMP_DIR/osiris.zip" "$TMP_DIR" <<'PY'
+          import sys, zipfile
+          archive, out = sys.argv[1], sys.argv[2]
+          with zipfile.ZipFile(archive) as z:
+              z.extractall(out)
+          PY
+          SRC="$(find "$TMP_DIR" -maxdepth 1 -type d -name 'osiris-*' | head -n1)"
+          test -n "$SRC"
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -a "$SRC"/. .
+          mkdir -p .github/workflows
+          cp /tmp/bootstrap-oeil-v1.yml .github/workflows/bootstrap-oeil-v1.yml
+
+      - name: Apply Oeil de Dieu branding and CCTV V1 improvements
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+          import json, re
+
+          root = Path('.')
+
+          # Brand visible UI only; keep internal OsirisMap identifiers intact.
+          targets = [
+              root/'src/app/page.tsx',
+              root/'src/app/layout.tsx',
+              root/'src/components/CameraViewer.tsx',
+              root/'src/components/LayerPanel.tsx',
+              root/'src/components/GlobalStatusBar.tsx',
+              root/'src/components/SearchBar.tsx',
+              root/'src/components/OsintPanel.tsx',
+              root/'public/manifest.json',
+              root/'public/site.webmanifest',
+          ]
+          for p in targets:
+              if not p.exists():
+                  continue
+              s = p.read_text(encoding='utf-8')
+              s = s.replace('OSIRIS — RECON', 'ŒIL DE DIEU — RECON')
+              s = s.replace('OSIRIS', 'ŒIL DE DIEU')
+              s = s.replace('/eye-of-horus.svg', '/oeil-de-dieu.svg')
+              p.write_text(s, encoding='utf-8')
+
+          # Package identity only; preserve build scripts and dependencies.
+          pkg = root/'package.json'
+          if pkg.exists():
+              data = json.loads(pkg.read_text(encoding='utf-8'))
+              data['name'] = 'oeil-de-dieu'
+              data['version'] = '1.0.0'
+              pkg.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+          # French PWA manifest.
+          manifest = root/'public/manifest.json'
+          if manifest.exists():
+              try:
+                  data = json.loads(manifest.read_text(encoding='utf-8'))
+                  data['name'] = 'Œil de Dieu — Plateforme mondiale OSINT'
+                  data['short_name'] = 'Œil de Dieu'
+                  data['description'] = 'Carte mondiale OSINT en temps réel : aviation, satellites, caméras publiques, séismes, incendies, météo et outils d’analyse.'
+                  data['theme_color'] = '#D4AF37'
+                  manifest.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+              except Exception:
+                  pass
+
+          # CCTV improvements: reconnect HLS and French user-facing status labels.
+          cam = root/'src/components/CameraViewer.tsx'
+          if cam.exists():
+              s = cam.read_text(encoding='utf-8')
+              old = """        hls.on(Hls.Events.ERROR, (event, data) => {\n          if (data.fatal) setError(true);\n        });"""
+              new = """        hls.on(Hls.Events.ERROR, (_event, data) => {\n          if (!data.fatal) return;\n          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {\n            setLoading(true);\n            setTimeout(() => hls.startLoad(), 1500);\n            return;\n          }\n          if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {\n            hls.recoverMediaError();\n            return;\n          }\n          setError(true);\n        });"""
+              s = s.replace(old, new)
+              repl = {
+                  'CAMERA WITHDRAWN':'CAMÉRA RETIRÉE',
+                  'CAMERA OFFLINE':'CAMÉRA HORS LIGNE',
+                  '>RETRY<':'>RÉESSAYER<',
+                  "'SNAPSHOT'":"'IMAGE ACTUALISÉE'",
+                  "'LIVE SAT-LINK'":"'IMAGE EN DIRECT'",
+                  "'LIVE FEED'":"'EN DIRECT'",
+                  'WATCH LIVE':'VOIR LE DIRECT À LA SOURCE',
+                  "'WITHDRAWN'":"'RETIRÉE'",
+                  "'OFFLINE'":"'HORS LIGNE'",
+                  "'EXTERNAL'":"'SOURCE EXTERNE'",
+                  "'YOUTUBE LIVE'":"'YOUTUBE EN DIRECT'",
+                  '>STATUS<':'>ÉTAT<',
+                  "'REMOVED BY SOURCE'":"'RETIRÉE PAR LA SOURCE'",
+                  "'OFF AIR AT SOURCE'":"'HORS LIGNE À LA SOURCE'",
+                  "'LIVE VIDEO AT SOURCE'":"'DIRECT DISPONIBLE À LA SOURCE'",
+                  "'HOSTED OFF-PLATFORM'":"'HÉBERGÉ HORS APPLICATION'",
+                  "'ACTIVE / RECORDING'":"'ACTIF / EN LECTURE'",
+                  'RAW FEED':'SOURCE DU FLUX',
+                  'MAP TARGET':'VOIR SUR LA CARTE',
+              }
+              for a,b in repl.items():
+                  s=s.replace(a,b)
+              cam.write_text(s, encoding='utf-8')
+
+          logo = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Œil de Dieu"><defs><radialGradient id="g" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#fff7c7"/><stop offset=".35" stop-color="#e4c45a"/><stop offset="1" stop-color="#8a6414"/></radialGradient><filter id="glow"><feGaussianBlur stdDeviation="8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><rect width="512" height="512" rx="96" fill="#06060c"/><g filter="url(#glow)"><path d="M256 70 449 408H63Z" fill="none" stroke="#d4af37" stroke-width="18" stroke-linejoin="round"/><path d="M108 360h296M139 306h234M170 252h172" stroke="#7e611d" stroke-width="8" opacity=".7"/><path d="M135 254c35-52 75-76 121-76s86 24 121 76c-35 52-75 76-121 76s-86-24-121-76Z" fill="#0a0b10" stroke="#f1d36b" stroke-width="12"/><ellipse cx="256" cy="254" rx="55" ry="66" fill="url(#g)"/><circle cx="256" cy="254" r="28" fill="#11131a"/><circle cx="246" cy="241" r="8" fill="#fff6c0"/></g></svg>'''
+          public = root/'public'
+          public.mkdir(exist_ok=True)
+          for name in ['oeil-de-dieu.svg','favicon.svg','eye-of-horus.svg']:
+              (public/name).write_text(logo, encoding='utf-8')
+
+          # Netlify URL in metadata when present.
+          layout = root/'src/app/layout.tsx'
+          if layout.exists():
+              s=layout.read_text(encoding='utf-8')
+              s=s.replace('https://osirisai.live','https://oeil-de-dieu.netlify.app')
+              layout.write_text(s, encoding='utf-8')
+          PY
+
+      - name: Commit replacement to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "Replace legacy app with Œil de Dieu V1 (OSIRIS base)"
+          git push origin HEAD:main
