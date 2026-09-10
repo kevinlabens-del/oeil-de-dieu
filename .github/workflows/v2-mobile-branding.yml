@@ -1,0 +1,156 @@
+name: Oeil de Dieu V2 mobile branding
+
+on:
+  push:
+    paths:
+      - '.github/workflows/v2-mobile-branding.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  v2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply V2 branding, French UI and mobile fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path('.')
+
+          page = root/'src/app/page.tsx'
+          if page.exists():
+              s = page.read_text(encoding='utf-8')
+              replacements = {
+                  'OPEN SOURCE INTELLIGENCE':'RENSEIGNEMENT EN SOURCES OUVERTES',
+                  'REAL-TIME GLOBAL MONITORING':'SURVEILLANCE MONDIALE EN TEMPS RÉEL',
+                  'FLIGHTS · MARITIME · SATELLITES · CCTV · WEATHER · CYBER THREATS':'VOLS · MARITIME · SATELLITES · CAMÉRAS · MÉTÉO · CYBERMENACES',
+                  '>SUPPORT<':'>CR3@TIX<',
+                  'href=\'https://ko-fi.com/M8D41ZYW4Z\'':'href=\'https://www.gpt-creatix.fr\'',
+                  'label="LAYERS"':'label="COUCHES"',
+                  'label="MARKETS"':'label="MARCHÉS"',
+                  'label="INTEL"':'label="INFOS"',
+                  'label="SEARCH"':'label="RECHERCHE"',
+                  'label="RECON"':'label="ANALYSE"',
+                  'label="ROUTE"':'label="ITINÉRAIRE"',
+                  'label="REMOTE"':'label="DISTANT"',
+                  '>LAYERS<':'>COUCHES<',
+                  '>MARKETS<':'>MARCHÉS<',
+                  '>INTEL<':'>INFOS<',
+                  '>SEARCH<':'>RECHERCHE<',
+                  '>RECON<':'>ANALYSE<',
+                  '>ROUTE<':'>ITINÉRAIRE<',
+                  '>REMOTE<':'>DISTANT<',
+              }
+              for a,b in replacements.items():
+                  s = s.replace(a,b)
+
+              # Make the main title fit on narrow phones without clipping.
+              s = s.replace(
+                  'className="text-lg md:text-xl font-bold tracking-[0.4em] text-[#D4AF37] font-mono"',
+                  'className="oeil-de-dieu-title text-[14px] sm:text-lg md:text-xl font-bold tracking-[0.14em] sm:tracking-[0.24em] md:tracking-[0.4em] text-[#D4AF37] font-mono whitespace-nowrap"'
+              )
+              s = s.replace(
+                  'className="text-[9px] md:text-[10px] font-mono tracking-[0.2em] opacity-80 uppercase text-[#D4AF37]"',
+                  'className="oeil-de-dieu-subtitle text-[7px] sm:text-[9px] md:text-[10px] font-mono tracking-[0.10em] sm:tracking-[0.16em] md:tracking-[0.2em] opacity-80 uppercase text-[#D4AF37] whitespace-nowrap"'
+              )
+              page.write_text(s, encoding='utf-8')
+
+          # Remove the upstream token promotion from the visible UI while keeping
+          # the file itself untouched for easier upstream comparison.
+          token = root/'src/components/TokenPanel.tsx'
+          if token.exists():
+              token.write_text("'use client';\n\nexport default function TokenPanel() {\n  return null;\n}\n", encoding='utf-8')
+
+          layer = root/'src/components/LayerPanel.tsx'
+          if layer.exists():
+              s = layer.read_text(encoding='utf-8')
+              repl = {
+                  'Maritime Lines':'Lignes maritimes',
+                  "label: 'Commercial'":"label: 'Commercial'",
+                  "label: 'Private'":"label: 'Privé'",
+                  "label: 'Private Jets'":"label: 'Jets privés'",
+                  "label: 'Military'":"label: 'Militaire'",
+                  'SPACE TRACKING':'SUIVI SPATIAL',
+                  'All Satellites':'Tous les satellites',
+                  'Military / Intel':'Militaire / renseignement',
+                  'Earth Observation':'Observation terrestre',
+                  'Stations / Telescopes':'Stations / télescopes',
+                  'CCTV Cameras':'Caméras publiques',
+                  'Live Previews':'Aperçus en direct',
+                  'Live News Feeds':'Actualités en direct',
+                  'NATURAL HAZARDS':'RISQUES NATURELS',
+                  'Earthquakes':'Séismes',
+                  'Active Fires':'Incendies actifs',
+                  'Severe Weather':'Météo sévère',
+                  'THREATS & INTEL':'MENACES & RENSEIGNEMENT',
+                  'Nuclear Facilities':'Installations nucléaires',
+                  'Global Incidents':'Incidents mondiaux',
+                  'NETWORK INTEL':'RENSEIGNEMENT RÉSEAU',
+                  'Live Malware':'Malwares actifs',
+                  'Live Attacks':'Attaques en direct',
+                  'Internet Outages':'Pannes Internet',
+                  'Attack Origins':'Origines des attaques',
+                  "fullLabel: 'DISPLAY'":"fullLabel: 'AFFICHAGE'",
+                  'Day / Night Cycle':'Cycle jour / nuit',
+                  '3D Buildings':'Bâtiments 3D',
+                  '3D Terrain':'Terrain 3D',
+                  'Style Studio':'Studio visuel',
+              }
+              for a,b in repl.items(): s=s.replace(a,b)
+              layer.write_text(s, encoding='utf-8')
+
+          cam = root/'src/components/CameraViewer.tsx'
+          if cam.exists():
+              s = cam.read_text(encoding='utf-8')
+              repl = {
+                  'SECURE UPLINK':'LIAISON CAMÉRA',
+                  'SOURCE:':'SOURCE :',
+                  'Refresh feed':'Actualiser le flux',
+                  'Fly to location':'Voir sur la carte',
+                  'Toggle fullscreen':'Plein écran',
+                  'DECRYPTING FEED...':'CHARGEMENT DU FLUX...',
+                  'ACQUIRING UPLINK':'RECHERCHE DU FLUX',
+                  'Locating a direct feed':'Recherche d’un flux direct',
+                  'No longer published at source':'Cette caméra n’est plus publiée',
+                  'The operator has this feed off air':'Le flux est actuellement hors ligne',
+                  'CAMERA FEED':'FLUX CAMÉRA',
+              }
+              for a,b in repl.items(): s=s.replace(a,b)
+              # Mobile: allow fullscreen toggle too and use more screen height.
+              s = s.replace('className="hidden md:block p-1.5', 'className="block p-1.5')
+              s = s.replace("'bottom-[70px] left-2 right-2 md:bottom-6 md:right-6 md:left-auto md:w-[480px]'", "'bottom-[74px] left-1.5 right-1.5 md:bottom-6 md:right-6 md:left-auto md:w-[520px]'" )
+              s = s.replace("'aspect-video max-h-[35vh] md:max-h-none'", "'aspect-video max-h-[44vh] md:max-h-none'")
+              cam.write_text(s, encoding='utf-8')
+
+          css = root/'src/app/globals.css'
+          if css.exists():
+              s = css.read_text(encoding='utf-8')
+              marker = '/* OEIL-DE-DIEU-V2-MOBILE */'
+              if marker not in s:
+                  s += '''\n\n/* OEIL-DE-DIEU-V2-MOBILE */\n@media (max-width: 767px) {\n  .oeil-de-dieu-title {\n    max-width: calc(100vw - 150px);\n    overflow: visible;\n    line-height: 1.15;\n  }\n  .oeil-de-dieu-subtitle {\n    max-width: calc(100vw - 150px);\n    overflow: hidden;\n    text-overflow: ellipsis;\n  }\n  button, a { -webkit-tap-highlight-color: transparent; }\n}\n'''
+              css.write_text(s, encoding='utf-8')
+          PY
+
+      - name: Commit V2
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/page.tsx src/app/globals.css src/components/TokenPanel.tsx src/components/LayerPanel.tsx src/components/CameraViewer.tsx
+          if git diff --cached --quiet; then
+            echo "No V2 changes"
+            exit 0
+          fi
+          git commit -m "Œil de Dieu V2: mobile UI, French branding and CCTV viewer"
+          git push origin HEAD:main
