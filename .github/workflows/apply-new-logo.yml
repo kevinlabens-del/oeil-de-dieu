@@ -1,0 +1,54 @@
+name: Apply new Oeil de Dieu logo
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-new-logo.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-logo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Replace header logo with new image
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('src/app/page.tsx')
+          s = p.read_text(encoding='utf-8')
+          pattern = r'(<div className="flex items-center gap-3 w-fit">\s*)<svg viewBox="0 0 650 500".*?</svg>'
+          replacement = r'''\1<img
+            src="/oeil-de-dieu-logo.webp"
+            alt="Œil de Dieu"
+            className="w-12 h-12 md:w-16 md:h-16 rounded-full object-cover shrink-0 border border-[#00E5FF]/30 shadow-[0_0_18px_rgba(0,229,255,0.35)]"
+          />'''
+          s2, n = re.subn(pattern, replacement, s, count=1, flags=re.S)
+          if n != 1:
+              raise SystemExit(f'Header logo block not found: {n}')
+          s2 = s2.replace('src="/oeil-de-dieu.svg"', 'src="/oeil-de-dieu-logo.webp"')
+          p.write_text(s2, encoding='utf-8')
+          PY
+
+      - name: Commit logo replacement
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/page.tsx
+          if git diff --cached --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git commit -m "Replace app logo with new Oeil de Dieu emblem"
+          git push origin HEAD:main
