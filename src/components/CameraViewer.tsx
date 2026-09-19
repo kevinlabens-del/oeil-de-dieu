@@ -102,7 +102,15 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
 
     if (streamType === 'hls' && camera.stream_url) {
       if (Hls.isSupported() && videoRef.current) {
-        const hls = new Hls({ enableWorker: false });
+        const hls = new Hls({
+          enableWorker: false,
+          lowLatencyMode: true,
+          liveSyncDurationCount: 2,
+          liveMaxLatencyDurationCount: 5,
+          maxLiveSyncPlaybackRate: 1.5,
+          backBufferLength: 15,
+          maxBufferLength: 8,
+        });
         hlsRef.current = hls;
         hls.loadSource(camera.stream_url);
         hls.attachMedia(videoRef.current);
@@ -163,7 +171,7 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
     const iv = setInterval(() => {
       const url = targetUrl.includes('?') ? `${targetUrl}&_t=${Date.now()}` : `${targetUrl}?_t=${Date.now()}`;
       setImageUrl(url);
-    }, 5000); // 5s refresh for JPG
+    }, 3000); // source snapshots: refresh every 3s for near-live display
     return () => clearInterval(iv);
   }, [camera, streamType]);
 
@@ -314,6 +322,7 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
                 autoPlay
                 muted
                 playsInline
+                preload="auto"
               />
             ) : streamType === 'mjpeg' && camera.stream_url ? (
               <img
@@ -354,7 +363,7 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
               <div className="absolute top-3 left-3 flex items-center gap-2 bg-black/80 border border-[var(--gold-primary)]/50 px-2 py-1 shadow-[0_0_10px_rgba(0,0,0,0.8)]">
                 <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_#ef4444]" />
                 <span className="text-[9px] font-mono text-white tracking-[0.2em]">
-                  {watchLiveUrl ? 'IMAGE ACTUALISÉE' : streamType === 'jpg' ? 'IMAGE EN DIRECT' : 'EN DIRECT'}
+                  {watchLiveUrl ? 'APERÇU · SOURCE LIVE' : streamType === 'jpg' ? 'QUASI-DIRECT · 3 S' : streamType === 'mp4' ? 'VIDÉO ACTUALISÉE' : 'TEMPS RÉEL'}
                 </span>
               </div>
             )}
