@@ -71,7 +71,11 @@ export function freshen(url: string): string {
  * continuous streams and must never be re-pointed.
  */
 export function refreshInterval(kind: PreviewKind): number {
-  if (kind === 'jpg') return 15000;
-  if (kind === 'mp4') return 60000;
+  // Snapshot cameras cannot become true video if the upstream only publishes
+  // still frames, but polling every 3s means OSIRIS displays a new source frame
+  // within at most a few seconds of it becoming available. Continuous HLS and
+  // MJPEG streams remain untouched so their live connection is never restarted.
+  if (kind === 'jpg') return 3000;
+  if (kind === 'mp4') return 30000;
   return 0;
 }
