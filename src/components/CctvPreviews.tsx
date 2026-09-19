@@ -158,7 +158,15 @@ function VideoMedia({ cam: camera, onReady, onFail }: MediaProps) {
       }
       /* A short buffer: eight of these would otherwise each hold seconds of
          video for a tile the size of a postage stamp. */
-      const instance = new Hls({ enableWorker: false, maxBufferLength: 6 });
+      const instance = new Hls({
+        enableWorker: false,
+        lowLatencyMode: true,
+        liveSyncDurationCount: 2,
+        liveMaxLatencyDurationCount: 5,
+        maxLiveSyncPlaybackRate: 1.5,
+        backBufferLength: 12,
+        maxBufferLength: 6,
+      });
       hls = instance;
       instance.on(Hls.Events.ERROR, (_e, data) => { if (data.fatal) onFail(); });
       instance.loadSource(url);
@@ -244,7 +252,7 @@ function Tile({ cam: camera, onOpen }: { cam: PreviewCamera; onOpen: (cam: Previ
 
         <div className="pointer-events-none absolute left-1.5 top-1.5 flex items-center gap-1 bg-black/70 px-1 py-[1px]">
           <span className="h-1 w-1 rounded-full bg-[var(--alert-red)] animate-pulse" />
-          <span className="font-mono text-[7px] tracking-[0.18em] text-white/75">LIVE</span>
+          <span className="font-mono text-[7px] tracking-[0.18em] text-white/75">{camera.media.kind === 'jpg' ? 'QUASI LIVE' : camera.media.kind === 'mp4' ? 'VIDEO' : 'LIVE'}</span>
         </div>
 
         {/* Hover only: the tile is already a button, this says what it opens. */}
