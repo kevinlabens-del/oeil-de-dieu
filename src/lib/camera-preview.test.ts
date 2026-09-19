@@ -51,7 +51,7 @@ describe('previewMedia', () => {
 
 describe('refreshInterval', () => {
   it('re-requests snapshots often enough to look live', () => {
-    expect(refreshInterval('jpg')).toBe(15000);
+    expect(refreshInterval('jpg')).toBe(3000);
   });
 
   it('re-points MP4 clips far less often, because that restarts playback', () => {
