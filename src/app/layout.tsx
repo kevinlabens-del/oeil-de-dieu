@@ -190,14 +190,15 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="canonical" href={SITE_URL} />
         
-        {/* JSON-LD Structured Data */}
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
-
       </head>
       <body className="antialiased">
+        {/* Keep non-hoisted structured data in the body. Hosting-injected head
+            nodes can otherwise prevent React from claiming this script. */}
+        <script
+          id="oeil-de-dieu-structured-data"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
+        />
         <ErrorBoundary name="ŒIL DE DIEU Core">
           {children}
         </ErrorBoundary>
