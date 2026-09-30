@@ -6,7 +6,7 @@
   "display": "standalone",
   "background_color": "#06060C",
   "theme_color": "#D4AF37",
-  "orientation": "landscape-primary",
+  "orientation": "any",
   "categories": [
     "security",
     "intelligence",
@@ -32,5 +32,6 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "scope": "/"
 }

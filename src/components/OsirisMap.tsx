@@ -35,7 +35,7 @@ interface OsirisMapProps {
   onEntityClick?: (entity: any) => void;
   onMouseCoords?: (coords: { lat: number; lng: number }) => void;
   onRightClick?: (coords: { lat: number; lng: number }) => void;
-  onViewStateChange?: (vs: { zoom: number; latitude: number }) => void;
+  onViewStateChange?: (vs: { zoom: number; latitude: number; longitude: number }) => void;
   flyToLocation?: { lat: number; lng: number; zoom?: number; ts: number } | null;
   projection?: 'mercator' | 'globe';
   terrainEnabled?: boolean;
@@ -810,7 +810,7 @@ function OsirisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCl
       }
     });
     map.on('contextmenu', e => { e.preventDefault(); onRightClick?.({ lat: e.lngLat.lat, lng: e.lngLat.lng }); });
-    const reportViewState = () => { const c = map.getCenter(); onViewStateChange?.({ zoom: map.getZoom(), latitude: c.lat }); };
+    const reportViewState = () => { const c = map.getCenter(); onViewStateChange?.({ zoom: map.getZoom(), latitude: c.lat, longitude: c.lng }); };
     map.on('load', reportViewState);
     map.on('moveend', reportViewState);
     // Lightweight settled-view diagnostics for camera/terrain regressions.

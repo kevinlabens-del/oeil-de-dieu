@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ExternalLink, RefreshCw, MapPin, Camera, CameraOff, Maximize2, PlayCircle } from 'lucide-react';
-import Hls from 'hls.js';
+import { attachLiveVideo } from '@/lib/live-video';
+import { freshen, refreshInterval } from '@/lib/camera-preview';
 import { isHostedOffPlatform, liveFeedAtSource, localEmbed, needsResolution, offPlatformView } from '@/lib/camera-feed';
 
 interface CameraViewerProps {
@@ -12,7 +13,13 @@ interface CameraViewerProps {
   onLocate?: (lat: number, lng: number) => void;
 }
 
-export default function CameraViewer({ camera, onClose, onLocate }: CameraViewerProps) {
+export default function CameraViewer(props: CameraViewerProps) {
+  if (!props.camera) return null;
+  const camera = props.camera;
+  return <CameraViewerSession key={camera.id ?? `${camera.lat}:${camera.lng}:${camera.stream_url || camera.feed_url || camera.external_url}`} {...props} />;
+}
+
+function CameraViewerSession({ camera, onClose, onLocate }: CameraViewerProps) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -32,7 +39,6 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
 
   
   const videoRef = useRef<HTMLVideoElement>(null);
-  const hlsRef = useRef<Hls | null>(null);
 
   const externalFeedUrl = camera?.external_url || camera?.feed_url;
   const hostedOffPlatform = isHostedOffPlatform(camera);
@@ -70,13 +76,16 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
   useEffect(() => {
     if (!resolveKey) return;
     let live = true;
-    fetch(`/api/cctv/resolve?url=${encodeURIComponent(resolveKey)}`)
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    fetch(`/api/cctv/resolve?url=${encodeURIComponent(resolveKey)}`, { signal: controller.signal })
       .then(r => r.json())
       .then(d => { if (live) setResolution({ key: resolveKey, embed: d?.embeddable ? d.embedUrl : null, offline: d?.kind === 'offline' || d?.kind === 'missing', kind: d?.kind }); })
       // A resolver failure is not a broken camera — it falls back to the link.
-      .catch(() => { if (live) setResolution({ key: resolveKey, embed: null, offline: false }); });
-    return () => { live = false; };
-  }, [resolveKey]);
+      .catch(() => { if (live) setResolution({ key: resolveKey, embed: null, offline: false }); })
+      .finally(() => clearTimeout(timeout));
+    return () => { live = false; clearTimeout(timeout); controller.abort(); };
+  }, [resolveKey, retryCount]);
 
   const streamType = resolvedEmbed ? 'iframe' : (camera?.stream_type || 'jpg');
   const streamUrl: string | undefined = resolvedEmbed || camera?.stream_url;
@@ -89,72 +98,30 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
     setError(false);
     setImageUrl(null);
 
-    // Cleanup previous HLS instance
-    if (hlsRef.current) {
-      hlsRef.current.destroy();
-      hlsRef.current = null;
-    }
-
     if (externalOnly) {
       setLoading(false);
       return;
     }
 
-    if (streamType === 'hls' && camera.stream_url) {
-      if (Hls.isSupported() && videoRef.current) {
-        const hls = new Hls({
-          enableWorker: false,
-          lowLatencyMode: true,
-          liveSyncDurationCount: 2,
-          liveMaxLatencyDurationCount: 5,
-          maxLiveSyncPlaybackRate: 1.5,
-          backBufferLength: 15,
-          maxBufferLength: 8,
-        });
-        hlsRef.current = hls;
-        hls.loadSource(camera.stream_url);
-        hls.attachMedia(videoRef.current);
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          setLoading(false);
-          videoRef.current?.play().catch(() => {});
-        });
-        hls.on(Hls.Events.ERROR, (_event, data) => {
-          if (!data.fatal) return;
-          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-            setLoading(true);
-            setTimeout(() => hls.startLoad(), 1500);
-            return;
-          }
-          if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-            hls.recoverMediaError();
-            return;
-          }
-          setError(true);
-        });
-      } else if (videoRef.current?.canPlayType('application/vnd.apple.mpegurl')) {
-        videoRef.current.src = camera.stream_url;
-        videoRef.current.addEventListener('loadedmetadata', () => {
-          setLoading(false);
-          videoRef.current?.play().catch(() => {});
-        });
-      }
-      return;
+    if (streamType === 'hls' && streamUrl && videoRef.current) {
+      return attachLiveVideo(videoRef.current, streamUrl, {
+        ready: () => { setLoading(false); setError(false); },
+        loading: () => setLoading(true),
+        failed: () => { setLoading(false); setError(true); },
+      });
     }
 
-    if (streamType === 'mjpeg' && camera.stream_url) {
-      setLoading(false);
-      return;
-    }
-
-    if ((streamType === 'iframe' || streamType === 'mp4') && streamUrl) {
-      setLoading(false);
+    if (streamType === 'mjpeg' && streamUrl) return;
+    if (streamType === 'iframe' && streamUrl) return;
+    if (streamType === 'mp4' && streamUrl) {
+      setImageUrl(freshen(streamUrl));
       return;
     }
 
     // JPG fallback
     const targetUrl = camera.feed_url || camera.stream_url;
     if (targetUrl) {
-      const url = targetUrl.includes('?') ? `${targetUrl}&_t=${Date.now()}` : `${targetUrl}?_t=${Date.now()}`;
+      const url = freshen(targetUrl);
       setImageUrl(url);
     } else {
       setError(true);
@@ -162,18 +129,23 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
     }
   }, [camera, streamType, streamUrl, externalOnly, retryCount]);
 
-  // Auto-refresh for JPGs
+  // Clips need refreshing too; HLS/MJPEG keep a single continuous connection.
   useEffect(() => {
-    if (streamType !== 'jpg' || (!camera?.feed_url && !camera?.stream_url)) return;
-    const targetUrl = camera.feed_url || camera.stream_url;
+    if (externalOnly || error || (streamType !== 'jpg' && streamType !== 'mp4')) return;
+    const targetUrl = streamType === 'mp4' ? streamUrl : camera?.feed_url || streamUrl;
     if (!targetUrl) return;
-
     const iv = setInterval(() => {
-      const url = targetUrl.includes('?') ? `${targetUrl}&_t=${Date.now()}` : `${targetUrl}?_t=${Date.now()}`;
-      setImageUrl(url);
-    }, 3000); // source snapshots: refresh every 3s for near-live display
+      if (!document.hidden) setImageUrl(freshen(targetUrl));
+    }, refreshInterval(streamType));
     return () => clearInterval(iv);
-  }, [camera, streamType]);
+  }, [camera, streamType, streamUrl, externalOnly, error]);
+
+  // Image/iframe sources that never answer must not leave an endless spinner.
+  useEffect(() => {
+    if (!camera || externalOnly || !loading || error || streamType === 'hls') return;
+    const timer = setTimeout(() => { setLoading(false); setError(true); }, 20000);
+    return () => clearTimeout(timer);
+  }, [camera, streamType, externalOnly, loading, error, retryCount]);
 
   if (!camera) return null;
 
@@ -231,18 +203,16 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
                   {streamType === 'jpg' && (
                     <button 
                       onClick={() => {
-                        const targetUrl = camera.feed_url || camera.stream_url;
-                        if (targetUrl) {
-                          const url = targetUrl.includes('?') ? `${targetUrl}&_t=${Date.now()}` : `${targetUrl}?_t=${Date.now()}`;
-                          setImageUrl(url);
-                        }
+                        setError(false);
+                        setLoading(true);
+                        setRetryCount(c => c + 1);
                       }} 
                       className="p-1.5 rounded-sm bg-white/5 border border-white/10 hover:bg-[var(--gold-primary)]/20 hover:border-[var(--gold-primary)] transition-all" title="Actualiser le flux"
                     >
                       <RefreshCw className="w-3 h-3 text-[var(--text-secondary)] hover:text-[var(--gold-primary)]" />
                     </button>
                   )}
-                  {camera.lat && camera.lng && (
+                  {Number.isFinite(camera.lat) && Number.isFinite(camera.lng) && (
                     <button onClick={() => onLocate?.(camera.lat, camera.lng)} className="p-1.5 rounded-sm bg-white/5 border border-white/10 hover:bg-[var(--gold-primary)]/20 hover:border-[var(--gold-primary)] transition-all" title="Voir sur la carte">
                       <MapPin className="w-3 h-3 text-[var(--text-secondary)] hover:text-[var(--gold-primary)]" />
                     </button>
@@ -250,7 +220,7 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
                   <button onClick={() => setFullscreen(!fullscreen)} className="block p-1.5 rounded-sm bg-white/5 border border-white/10 hover:bg-[var(--text-primary)]/20 hover:border-[var(--text-primary)] transition-all" title="Plein écran">
                     <Maximize2 className="w-3 h-3 text-[var(--text-secondary)] hover:text-[var(--text-primary)]" />
                   </button>
-                  <button onClick={onClose} className="p-1.5 rounded-sm bg-red-900/30 border border-red-500/30 hover:bg-red-500/30 hover:border-red-500 transition-all ml-2">
+                  <button onClick={onClose} title="Fermer la caméra" className="p-1.5 rounded-sm bg-red-900/30 border border-red-500/30 hover:bg-red-500/30 hover:border-red-500 transition-all ml-2">
                     <X className="w-4 h-4 md:w-3 md:h-3 text-red-400 hover:text-red-200" />
                   </button>
                 </div>
@@ -286,14 +256,14 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
                 <CameraOff className="w-6 h-6 mb-3 opacity-50 text-[var(--text-muted)]" />
                 <p className="text-[11px] font-mono uppercase tracking-widest text-[var(--text-secondary)]">{gone ? 'CAMÉRA RETIRÉE' : 'CAMÉRA HORS LIGNE'}</p>
                 <p className="text-[9px] font-mono text-[var(--text-muted)] mt-2 max-w-[80%] uppercase">{gone ? 'Cette caméra n’est plus publiée' : 'Le flux est actuellement hors ligne'}</p>
-                {/* No ACCESS TERMINAL button: the page it would open is either
+                {/* No OUVRIR LA SOURCE button: the page it would open is either
                     showing the same 'offline' banner we just read, or a 404. */}
               </div>
             ) : view === 'external' ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-30 backdrop-blur-sm p-4 text-center">
                 <ExternalLink className="w-6 h-6 mb-3 opacity-50" style={{ color: 'var(--gold-primary)' }} />
-                <p className="text-[11px] font-mono uppercase tracking-widest" style={{ color: 'var(--gold-primary)' }}>SECURE FEED ENCRYPTED</p>
-                <p className="text-[9px] font-mono text-[var(--text-muted)] mt-2 max-w-[80%] uppercase">This feed requires external clearance</p>
+                <p className="text-[11px] font-mono uppercase tracking-widest" style={{ color: 'var(--gold-primary)' }}>LECTURE SUR LE SITE SOURCE</p>
+                <p className="text-[9px] font-mono text-[var(--text-muted)] mt-2 max-w-[80%] uppercase">Cette source ne propose pas de lecteur intégré</p>
                 <a 
                   href={externalFeedUrl} 
                   target="_blank" 
@@ -301,7 +271,7 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
                   className="mt-4 px-4 py-2 rounded text-[10px] font-mono font-bold tracking-widest transition-all hover:bg-white/10"
                   style={{ border: '1px solid var(--border-primary)', color: 'var(--gold-primary)' }}
                 >
-                  ACCESS TERMINAL
+                  OUVRIR LA SOURCE
                 </a>
               </div>
             ) : error ? (
@@ -323,6 +293,7 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
                 muted
                 playsInline
                 preload="auto"
+                controls
               />
             ) : streamType === 'mjpeg' && camera.stream_url ? (
               <img
@@ -332,9 +303,12 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
                 onLoad={() => setLoading(false)}
                 onError={() => { setLoading(false); setError(true); }}
               />
-            ) : streamType === 'mp4' && camera.stream_url ? (
+            ) : streamType === 'mp4' && imageUrl ? (
               <video
-                src={camera.stream_url}
+                src={imageUrl}
+                onLoadedData={() => { setLoading(false); setError(false); }}
+                onError={() => { setLoading(false); setError(true); }}
+                controls
                 className={`w-full h-full ${fullscreen ? 'object-contain' : 'object-cover'}`}
                 autoPlay
                 muted
@@ -343,7 +317,11 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
               />
             ) : streamType === 'iframe' && streamUrl ? (
               <iframe
+                key={`${streamUrl}-${retryCount}`}
                 src={streamUrl}
+                title={camera.name || "Caméra publique"}
+                onLoad={() => setLoading(false)}
+                onError={() => { setLoading(false); setError(true); }}
                 className="w-full h-full border-0"
                 allow="autoplay; fullscreen"
                 allowFullScreen
@@ -363,7 +341,7 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
               <div className="absolute top-3 left-3 flex items-center gap-2 bg-black/80 border border-[var(--gold-primary)]/50 px-2 py-1 shadow-[0_0_10px_rgba(0,0,0,0.8)]">
                 <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_#ef4444]" />
                 <span className="text-[9px] font-mono text-white tracking-[0.2em]">
-                  {watchLiveUrl ? 'APERÇU · SOURCE LIVE' : streamType === 'jpg' ? 'QUASI-DIRECT · 3 S' : streamType === 'mp4' ? 'VIDÉO ACTUALISÉE' : 'TEMPS RÉEL'}
+                  {watchLiveUrl ? 'APERÇU · SOURCE LIVE' : streamType === 'jpg' ? 'IMAGE · ACTUALISATION 3 S' : streamType === 'mp4' ? 'CLIP · ACTUALISATION 30 S' : streamType === 'iframe' ? 'LECTEUR EXTERNE' : 'FLUX EN DIRECT'}
                 </span>
               </div>
             )}
@@ -404,8 +382,8 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
                 <div className="flex flex-col border-l border-white/10 pl-4">
                   <span className="text-[9px] text-[var(--text-muted)] font-mono tracking-widest">ÉTAT</span>
                   {/* Nothing is being received locally for an external feed — don't claim otherwise. */}
-                  <span className={`text-[9px] font-mono tracking-widest ${externalOnly ? 'text-[var(--gold-primary)]' : 'text-[var(--alert-green)]'}`}>
-                    {view === 'offline' ? (gone ? 'RETIRÉE PAR LA SOURCE' : 'HORS LIGNE À LA SOURCE') : watchLiveUrl ? 'DIRECT DISPONIBLE À LA SOURCE' : externalOnly ? 'HÉBERGÉ HORS APPLICATION' : 'ACTIF / EN LECTURE'}
+                  <span className={`text-[9px] font-mono tracking-widest ${error ? 'text-red-400' : externalOnly || loading ? 'text-[var(--gold-primary)]' : 'text-[var(--alert-green)]'}`}>
+                    {error ? 'FLUX INDISPONIBLE' : loading ? 'CONNEXION EN COURS' : view === 'offline' ? (gone ? 'RETIRÉE PAR LA SOURCE' : 'HORS LIGNE À LA SOURCE') : watchLiveUrl ? 'DIRECT DISPONIBLE À LA SOURCE' : externalOnly ? 'HÉBERGÉ HORS APPLICATION' : streamType === 'iframe' ? 'LECTEUR CHARGÉ' : 'FLUX REÇU'}
                   </span>
                 </div>
               </div>

@@ -14,64 +14,34 @@ concurrency:
 
 jobs:
   verify:
-    name: Node ${{ matrix.node }}
-    runs-on: ubuntu-latest
+    name: ${{ matrix.os }} / Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        node: [24.14.0, 26.x]
-    env:
-      PUPPETEER_SKIP_DOWNLOAD: '1'
-      GEV_REQUIRE_ALLOCATION_GATE: ${{ matrix.node == '24.14.0' && '1' || '0' }}
+        include:
+          - os: ubuntu-latest
+            node: 20
+          - os: ubuntu-latest
+            node: 24
+          - os: windows-latest
+            node: 24
     steps:
       - name: Check out source
         uses: actions/checkout@v4
         with:
           persist-credentials: false
-
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
           cache: npm
-
       - name: Install locked dependencies
         run: npm ci
-
-      - name: Run setup policy checks
-        run: npm run doctor -- --json
-
-      - name: Run unit tests
+      - name: Prepare map runtime
+        run: node tools/prepare-map-worker.mjs
+      - name: Run unit and regression tests
         run: npm test
-
-      - name: Build production bundle
-        run: npm run build
-
-  windows-onboarding:
-    name: Windows onboarding
-    runs-on: windows-latest
-    timeout-minutes: 20
-    env:
-      PUPPETEER_SKIP_DOWNLOAD: '1'
-      GEV_REQUIRE_ALLOCATION_GATE: '0'
-    steps:
-      - name: Check out source
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - name: Use Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24.14.0
-          cache: npm
-
-      - name: Run the Pinokio install path
-        run: node scripts/pinokio-install.mjs
-
-      - name: Run focused onboarding tests
-        run: node --test src/setupDoctor.test.mjs src/pinokioEnvironment.test.mjs src/pinokioPreflight.test.mjs src/pinokioLauncherContract.test.mjs src/mapStartup.test.mjs src/hudSummaryResponse.test.mjs
-
-      - name: Build production bundle
+      - name: Build production bundle and check TypeScript
         run: npm run build

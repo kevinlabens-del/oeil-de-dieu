@@ -34,8 +34,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Scanner backend
-scanner/
+# Scanner backend (do not exclude src/app/api/scanner)
+/scanner/
 
 # Data files
 threatfox.json

@@ -1,3 +1,4 @@
+import { getGeminiApiKeys, GEMINI_MODEL } from '@/lib/ai-engine';
 /**
  * ═══════════════════════════════════════════════════════════════
  *  OSIRIS — AI Intelligence Analysis Endpoint
@@ -61,14 +62,7 @@ setInterval(() => {
    ───────────────────────────────────────────────────────────── */
 
 function getEnvApiKeys(): string[] {
-  const keys: string[] = [];
-  for (let i = 1; i <= 8; i++) {
-    const key = process.env[`GEMINI_API_KEY_${i}`];
-    if (key && key.trim().length > 0) {
-      keys.push(key.trim());
-    }
-  }
-  return keys;
+  return getGeminiApiKeys();
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -179,7 +173,7 @@ export async function POST(
     return NextResponse.json(
       {
         analysis,
-        model: 'gemini-2.0-flash',
+        model: GEMINI_MODEL,
         timestamp: new Date().toISOString(),
       },
       {

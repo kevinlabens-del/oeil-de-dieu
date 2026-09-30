@@ -6,7 +6,8 @@ import { Keyboard, X } from 'lucide-react';
 
 const SHORTCUTS = [
   { key: 'F', desc: 'Toggle fullscreen' },
-  { key: 'S', desc: 'Share current view' },
+  { key: 'S', desc: 'Open search' },
+  { key: 'Shift+S', desc: 'Share current view' },
   { key: 'L', desc: 'Toggle layer panel' },
   { key: 'M', desc: 'Toggle markets panel' },
   { key: 'I', desc: 'Toggle intel feed' },

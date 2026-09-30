@@ -1,12 +1,21 @@
 /**
  * ═══════════════════════════════════════════════════════════════
  *  OSIRIS — AI Intelligence Engine
- *  Gemini 2.0 Flash integration for real-time intelligence analysis
+ *  Configurable Gemini integration for real-time intelligence analysis
  *  Designed to correlate multi-domain feeds into actionable briefings
  * ═══════════════════════════════════════════════════════════════
  */
 
 import { GoogleGenerativeAI, type GenerativeModel } from '@google/generative-ai';
+
+// 2.0 Flash was retired. Keep the replacement configurable server-side.
+export const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || 'gemini-3.6-flash';
+
+export function getGeminiApiKeys(): string[] {
+  return [...new Set([process.env.GEMINI_API_KEY, ...Array.from({ length: 8 }, (_, i) => process.env[`GEMINI_API_KEY_${i + 1}`])]
+    .map(key => key?.trim()).filter((key): key is string => Boolean(key)))];
+}
+
 
 /* ─────────────────────────────────────────────────────────────
    Data Interfaces — Zero `any` types
@@ -223,7 +232,7 @@ export async function analyzeIntelligence(
   userQuery: string
 ): Promise<string> {
   const model: GenerativeModel = client.getGenerativeModel({
-    model: 'gemini-2.0-flash',
+    model: GEMINI_MODEL,
     systemInstruction: SYSTEM_PROMPT,
   });
 
@@ -251,7 +260,7 @@ export async function generateBriefing(
   context: IntelligenceContext
 ): Promise<string> {
   const model: GenerativeModel = client.getGenerativeModel({
-    model: 'gemini-2.0-flash',
+    model: GEMINI_MODEL,
     systemInstruction: SYSTEM_PROMPT,
   });
 

@@ -8,9 +8,10 @@ interface SharePanelProps {
   mapView: { zoom: number; latitude: number; longitude?: number };
   activeLayers: Record<string, boolean>;
   mouseCoords?: { lat: number; lng: number } | null;
+  inline?: boolean;
 }
 
-export default function SharePanel({ mapView, activeLayers, mouseCoords }: SharePanelProps) {
+export default function SharePanel({ mapView, activeLayers, mouseCoords, inline = false }: SharePanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -27,9 +28,9 @@ export default function SharePanel({ mapView, activeLayers, mouseCoords }: Share
       .filter(([, v]) => v)
       .map(([k]) => k)
       .join(',');
-    if (layerKeys) params.set('layers', layerKeys);
+    params.set('layers', layerKeys);
 
-    const base = typeof window !== 'undefined' ? window.location.origin : 'https://osiris.vercel.app';
+    const base = typeof window !== 'undefined' ? window.location.origin : 'https://oeil-de-dieu.netlify.app';
     return `${base}/?${params.toString()}`;
   }, [mapView, activeLayers, mouseCoords]);
 
@@ -55,7 +56,7 @@ export default function SharePanel({ mapView, activeLayers, mouseCoords }: Share
   // Keyboard shortcut
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 's' && !e.ctrlKey && !e.metaKey && !['INPUT', 'TEXTAREA'].includes((e.target as Element)?.tagName)) {
+      if (e.key === 'S' && e.shiftKey && !e.ctrlKey && !e.metaKey && !['INPUT', 'TEXTAREA'].includes((e.target as Element)?.tagName)) {
         setIsOpen(p => !p);
       }
     };
@@ -71,7 +72,7 @@ export default function SharePanel({ mapView, activeLayers, mouseCoords }: Share
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.95 }}
         className="glass-panel w-8 h-8 flex items-center justify-center pointer-events-auto hover:border-[var(--gold-primary)] transition-colors"
-        title="Share view (S)"
+        title="Partager la vue (Maj+S)"
       >
         <Share2 className="w-3.5 h-3.5 text-[var(--gold-primary)]" />
       </motion.button>
@@ -83,7 +84,7 @@ export default function SharePanel({ mapView, activeLayers, mouseCoords }: Share
             initial={{ opacity: 0, y: -10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
-            className="absolute top-12 right-0 w-72 glass-panel p-4 pointer-events-auto osiris-glow z-[300]"
+            className={`${inline ? 'relative mt-2 w-full' : 'absolute top-12 right-0 w-72'} glass-panel p-4 pointer-events-auto osiris-glow z-[300]`}
           >
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -102,7 +103,7 @@ export default function SharePanel({ mapView, activeLayers, mouseCoords }: Share
                 <span className="text-[9px] font-mono text-[var(--text-muted)] tracking-widest">CURRENT VIEW</span>
               </div>
               <div className="text-[9px] font-mono text-[var(--text-secondary)]">
-                {mouseCoords ? `${mouseCoords.lat.toFixed(4)}°, ${mouseCoords.lng.toFixed(4)}°` : '—'} · Zoom {mapView.zoom.toFixed(1)}
+                {(mouseCoords?.lat ?? mapView.latitude).toFixed(4)}°, {(mouseCoords?.lng ?? mapView.longitude ?? 0).toFixed(4)}° · Zoom {mapView.zoom.toFixed(1)}
               </div>
               <div className="text-[9px] font-mono text-[var(--text-muted)] mt-1">
                 {Object.values(activeLayers).filter(Boolean).length} layers active
@@ -145,7 +146,7 @@ export default function SharePanel({ mapView, activeLayers, mouseCoords }: Share
                 IN SHARE
               </a>
               <a
-                href={`https://reddit.com/submit?url=${encodeURIComponent(generateShareUrl())}&title=${encodeURIComponent('OSIRIS — Open Source Global Intelligence Platform')}`}
+                href={`https://reddit.com/submit?url=${encodeURIComponent(generateShareUrl())}&title=${encodeURIComponent('ŒIL DE DIEU — Vue de la carte')}`}
                 target="_blank"
                 className="flex-1 text-center py-1.5 rounded text-[9px] font-mono tracking-wider text-[var(--text-muted)] border border-[var(--border-primary)] hover:border-[#FF4500] hover:text-[#FF4500] transition-colors"
               >

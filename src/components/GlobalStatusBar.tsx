@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 
@@ -71,67 +71,22 @@ const formatChange = (change: number | undefined) => {
   );
 };
 
-export default function GlobalStatusBar() {
-  const [crypto, setCrypto] = useState<CryptoPrice[]>([]);
-  const [quakes, setQuakes] = useState<Earthquake[]>([]);
+interface StatusBarProps {
+  markets?: { crypto?: Record<string, { symbol: string; price: number; change_percent?: number }> };
+  earthquakes?: Earthquake[];
+}
+
+export default function GlobalStatusBar({ markets, earthquakes = [] }: StatusBarProps) {
   const [hoveredQuake, setHoveredQuake] = useState<Earthquake | null>(null);
+  // Reuse the dashboard feeds. A separate browser-side CoinGecko request was
+  // failing CORS and leaving the ticker empty despite working market data.
+  const crypto: CryptoPrice[] = Object.values(markets?.crypto ?? {})
+    .filter(q => ['BTC-USD', 'ETH-USD', 'SOL-USD'].includes(q.symbol) && Number.isFinite(q.price))
+    .map(q => ({ symbol: q.symbol.replace('-USD', ''), price: q.price, change24h: q.change_percent }));
+  const quakes = earthquakes.filter(q => q.magnitude >= 4)
+    .sort((a, b) => b.time - a.time).slice(0, 5);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [cryptoRes, quakeRes] = await Promise.allSettled([
-          fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true')
-            .then(res => res.ok ? res.json() : Promise.reject('CoinGecko error'))
-            .then(data => {
-              const prices: CryptoPrice[] = [];
-              if (data.bitcoin?.usd) prices.push({ symbol: 'BTC', price: data.bitcoin.usd, change24h: data.bitcoin.usd_24h_change });
-              if (data.ethereum?.usd) prices.push({ symbol: 'ETH', price: data.ethereum.usd, change24h: data.ethereum.usd_24h_change });
-              if (data.solana?.usd) prices.push({ symbol: 'SOL', price: data.solana.usd, change24h: data.solana.usd_24h_change });
-              return { ok: true, json: async () => prices };
-            }),
-          fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson')
-            .then(res => res.ok ? res.json() : Promise.reject('USGS error'))
-            .then(data => ({
-              ok: true,
-              json: async () => ({
-                earthquakes: (data.features || []).map((f: any) => ({
-                  id: f.id,
-                  lat: f.geometry?.coordinates?.[1] || 0,
-                  lng: f.geometry?.coordinates?.[0] || 0,
-                  depth: f.geometry?.coordinates?.[2] || 0,
-                  magnitude: f.properties?.mag,
-                  place: f.properties?.place,
-                  time: f.properties?.time,
-                  url: f.properties?.url,
-                  tsunami: f.properties?.tsunami,
-                  type: f.properties?.type,
-                  felt: f.properties?.felt,
-                  alert: f.properties?.alert,
-                }))
-              })
-            })),
-        ]);
-
-        if (cryptoRes.status === 'fulfilled' && cryptoRes.value.ok) {
-          setCrypto(await cryptoRes.value.json());
-        }
-        if (quakeRes.status === 'fulfilled' && quakeRes.value.ok) {
-          const quakeData = await quakeRes.value.json();
-          const majorQuakes = (quakeData.earthquakes || [])
-            .filter((q: Earthquake) => q.magnitude >= 4.0)
-            .sort((a: Earthquake, b: Earthquake) => b.time - a.time)
-            .slice(0, 5);
-          setQuakes(majorQuakes);
-        }
-      } catch (e) { console.warn('[ŒIL DE DIEU] Suppressed error:', e instanceof Error ? e.message : e); }
-    };
-    fetchData();
-    const iv = setInterval(fetchData, 60000);
-    return () => clearInterval(iv);
-  }, []);
-
-  // Keep the bar mounted even with no feed data — the left-hand community and
-  // docs links must stay reachable when CoinGecko/USGS are rate-limited or down.
+  // Community and docs links stay reachable even when feeds are unavailable.
   const hasTicker = crypto.length > 0 || quakes.length > 0;
 
   const solPrice = crypto.find(c => c.symbol === 'SOL');

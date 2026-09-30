@@ -1437,7 +1437,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
         {activeTab === 'scanner' && (
           <select value={scanType} onChange={e => setScanType(e.target.value)}
             className="bg-[var(--bg-primary)]/60 border border-[var(--border-primary)] rounded-lg px-2 py-1.5 text-[11px] font-mono text-[var(--text-muted)] outline-none w-full">
-            <option value="quick">QUICK SCAN</option><option value="deep">DEEP SCAN</option><option value="ports">TOP 1000 PORTS</option>
+            <option value="quick">QUICK SCAN</option><option value="deep" disabled>DEEP SCAN — indisponible</option><option value="ports" disabled>TOP 1000 PORTS — indisponible</option>
           </select>
         )}
         {activeTab === 'sweep' && (

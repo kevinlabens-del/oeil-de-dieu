@@ -1,3 +1,4 @@
+import { getGeminiApiKeys, GEMINI_MODEL } from '@/lib/ai-engine';
 /**
  * ═══════════════════════════════════════════════════════════════
  *  OSIRIS — One-Click AI Overview
@@ -18,12 +19,7 @@ export const dynamic = 'force-dynamic';
 type Mode = 'alerts' | 'markets' | 'chain';
 
 function getEnvApiKeys(): string[] {
-  const keys: string[] = [];
-  for (let i = 1; i <= 8; i++) {
-    const key = process.env[`GEMINI_API_KEY_${i}`];
-    if (key && key.trim().length > 0) keys.push(key.trim());
-  }
-  return keys;
+  return getGeminiApiKeys();
 }
 
 /* ─────────────────────────── Digest builders ─────────────────────────── */
@@ -226,7 +222,7 @@ async function geminiOverview(mode: Mode, digest: Digest, keys: string[]): Promi
   try {
     const client = createGeminiClient(rotateApiKey(keys));
     const model = client.getGenerativeModel({
-      model: 'gemini-2.0-flash',
+      model: GEMINI_MODEL,
       systemInstruction:
         'You are OSIRIS, a terse intelligence analyst. Given structured facts, write a sharp 2-4 sentence situational read-out. No preamble, no markdown headers, no hedging. Lead with the bottom line.',
     });

@@ -4,6 +4,8 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Layers, BarChart3, Newspaper, Search, X, Globe, MapPinned, Route, Radar, Satellite, Moon, ExternalLink, AlertTriangle, Activity, Database, Wifi, Play, Network, Crosshair, Bluetooth, Pentagon, Radio , PenLine } from 'lucide-react';
+import { createLayerLoader } from '@/lib/layer-loader';
+import { parseSharedView } from '@/lib/shared-view';
 import { type TerrainStatus } from '@/lib/map-terrain';
 import { loadCameraCatalog, mergeCameraCatalog } from '@/lib/camera-catalog';
 import IntelFeed from '@/components/IntelFeed';
@@ -139,7 +141,7 @@ export default function Dashboard() {
   const data = dataRef.current;
 
   const [backendStatus, setBackendStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
-  const [mapView, setMapView] = useState({ zoom: 2.5, latitude: 20 });
+  const [mapView, setMapView] = useState({ zoom: 2.5, latitude: 20, longitude: 0 });
   const [flyToLocation, setFlyToLocation] = useState<{ lat: number; lng: number; zoom?: number; ts: number } | null>(null);
   const [globalStats, setGlobalStats] = useState<any>(null);
   const mouseCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
@@ -326,6 +328,7 @@ export default function Dashboard() {
     cf_outages: false,
     cf_attacks: false,
   });
+  const [layersRestored, setLayersRestored] = useState(false);
   // Server-side capability flags — gate layers that need credentials.
   const selectFlatMap = () => {
     setActiveLayers(prev => ({ ...prev, terrain_elevation: false, terrain_3d: false }));
@@ -355,7 +358,7 @@ export default function Dashboard() {
     // Restore active layers from URL if present
     const p = new URLSearchParams(window.location.search);
     const layers = p.get('layers');
-    if (layers) {
+    if (layers !== null) {
       const active = layers.split(',');
       setActiveLayers(prev => {
         const next = { ...prev };
@@ -363,6 +366,13 @@ export default function Dashboard() {
         return next;
       });
     }
+
+    const sharedView = parseSharedView(window.location.search);
+    if (sharedView) {
+      autoLocateCancelled.current = true;
+      setFlyToLocation({ ...sharedView, ts: Date.now() });
+    }
+    setLayersRestored(true);
 
     // Probe which credential-gated feeds this deployment has configured, so the
     // layer panel can hide toggles that could never return data.
@@ -397,16 +407,19 @@ export default function Dashboard() {
     };
   }, []);
 
-  // URL state: persist active layers only (lat/lon comes from IP geolocation on each load)
+  // Preserve shared coordinates while persisting the current layer selection.
   const urlTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (urlTimer.current) clearTimeout(urlTimer.current);
     urlTimer.current = setTimeout(() => {
       const active = Object.entries(activeLayers).filter(([,v]) => v).map(([k]) => k).join(',');
-      const url = `${window.location.pathname}?layers=${active}`;
+      const params = new URLSearchParams(window.location.search);
+      params.set('layers', active);
+      const url = `${window.location.pathname}?${params.toString()}`;
       window.history.replaceState(null, '', url);
     }, 1500);
+    return () => { if (urlTimer.current) clearTimeout(urlTimer.current); };
   }, [activeLayers]);
 
   // Global Stats Fetch
@@ -577,15 +590,17 @@ export default function Dashboard() {
     if (skipWhenHidden && typeof document !== 'undefined' && document.hidden) return false;
     try {
       // Force the browser to bypass its local disk cache for real-time data
-      const res = await fetch(url, { ...options, cache: 'no-store' });
+      const res = await fetch(url, { ...options, signal: options?.signal ?? AbortSignal.timeout(45000), cache: 'no-store' });
       if (res.ok) {
         const json = await res.json();
+        if (json?.error) return false;
         const d = transform ? transform(json) : json;
         dataRef.current = { ...dataRef.current, ...d };
         setDataVersion(v => v + 1);
         setBackendStatus('connected');
         return true;
       }
+      setBackendStatus('error');
       return false;
     } catch (e) {
       console.warn('[ŒIL DE DIEU] Suppressed error:', e instanceof Error ? e.message : e);
@@ -636,9 +651,14 @@ export default function Dashboard() {
   }, [fetchEndpoint]);
 
   // ── LAYER-AWARE DATA LOADING — only fetch when layer is toggled ON ──
-  const layerFetchedRef = useRef<Set<string>>(new Set());
+  const layerLoaderRef = useRef<ReturnType<typeof createLayerLoader> | null>(null);
   useEffect(() => {
-    if (!activeLayers.cctv) return;
+    const loader = createLayerLoader();
+    layerLoaderRef.current = loader;
+    return () => loader.dispose();
+  }, []);
+  useEffect(() => {
+    if (!layersRestored || !activeLayers.cctv) return;
     return loadCameraCatalog(cameras => {
       dataRef.current = {
         ...dataRef.current,
@@ -647,119 +667,31 @@ export default function Dashboard() {
       setDataVersion(value => value + 1);
       setBackendStatus('connected');
     }, () => console.warn('[ŒIL DE DIEU] Camera catalogue load failed; bounded retry scheduled'));
-  }, [activeLayers.cctv]);
+  }, [layersRestored, activeLayers.cctv]);
 
   useEffect(() => {
-
-    // Flights
-    if (activeLayers.flights || activeLayers.military || activeLayers.jets || activeLayers.private) {
-      if (!layerFetchedRef.current.has('flights')) {
-        fetchEndpoint('/api/flights');
-        layerFetchedRef.current.add('flights');
-      }
-    }
-    // Satellites (any satellite sub-layer triggers fetch)
-    const anySatLayer = activeLayers.satellites || activeLayers.sat_comms || activeLayers.sat_military || activeLayers.sat_navigation || activeLayers.sat_earth || activeLayers.sat_science;
-    if (anySatLayer && !layerFetchedRef.current.has('satellites')) {
-      // Keep the moment the positions were propagated for. The catalogue is
-      // fetched once and never re-polled, so by the time an orbit is requested
-      // these markers can be a long way out of date — the orbit route needs the
-      // marker's epoch to draw a track that still passes through it.
-      fetchEndpoint('/api/satellites', d => ({ ...d, satellites_at: d.timestamp }));
-      layerFetchedRef.current.add('satellites');
-    }
-    // Fires
-    if (activeLayers.fires && !layerFetchedRef.current.has('fires')) {
-      fetchEndpoint('/api/fires');
-      layerFetchedRef.current.add('fires');
-    }
-    // Maritime
-    if (activeLayers.maritime && !layerFetchedRef.current.has('maritime')) {
-      fetchEndpoint('/api/maritime', d => ({ maritime_ports: d.ports, maritime_chokepoints: d.chokepoints, maritime_ships: d.ships }));
-      layerFetchedRef.current.add('maritime');
-    }
-    // Balloons
-    if (activeLayers.balloons && !layerFetchedRef.current.has('balloons')) {
-      fetchEndpoint('/api/balloons', d => ({ balloons: d.balloons }));
-      layerFetchedRef.current.add('balloons');
-    }
-    // Radiation
-    if (activeLayers.radiation && !layerFetchedRef.current.has('radiation')) {
-      fetchEndpoint('/api/radiation', d => ({ radiation: d.stations }));
-      layerFetchedRef.current.add('radiation');
-    }
-    // Live News
-    if (activeLayers.live_news && !layerFetchedRef.current.has('live_news')) {
-      fetchEndpoint('/api/live-news', d => ({ live_feeds: d.feeds }));
-      layerFetchedRef.current.add('live_news');
-    }
-    // Weather
-    if (activeLayers.weather && !layerFetchedRef.current.has('weather')) {
-      fetchEndpoint('/api/weather', d => ({ weather_events: d.events }));
-      layerFetchedRef.current.add('weather');
-    }
-    // Infrastructure
-    if (activeLayers.infrastructure && !layerFetchedRef.current.has('infrastructure')) {
-      fetchEndpoint('/api/infrastructure', d => ({ infrastructure: d.infrastructure }));
-      layerFetchedRef.current.add('infrastructure');
-    }
-    // Global Incidents (GDELT)
-    if (activeLayers.global_incidents && !layerFetchedRef.current.has('gdelt')) {
-      fetchEndpoint('/api/gdelt', d => ({ gdelt: d.events }));
-      layerFetchedRef.current.add('gdelt');
-    }
-
-    // Submarine Cables
-    if (activeLayers.cables && !layerFetchedRef.current.has('cables')) {
-      (async () => {
-        try {
-          const ts = Date.now();
-      const res = await fetch(`/data/submarine-cables.json?v=${ts}`);
-          if (res.ok) {
-             const cablesData = await res.json();
-             dataRef.current = { ...dataRef.current, submarine_cables: cablesData.features };
-             setDataVersion(v => v + 1);
-          }
-        } catch (e) { console.warn('Cables fetch failed'); }
-      })();
-      layerFetchedRef.current.add('cables');
-    }
-
-
-    // Live Malware (abuse.ch) is pushed, not fetched — see the SSE subscription below.
-
-    // Live Cyber Attacks (animated arcs)
-    if ((activeLayers as any).cyber_attacks && !layerFetchedRef.current.has('cyber_attacks')) {
-      fetchEndpoint('/api/cyber-attacks', d => ({ cyber_attacks: d.attacks }));
-      layerFetchedRef.current.add('cyber_attacks');
-    }
-
-    /* Mark before awaiting so a re-render mid-flight cannot double-fetch, then
-       release the mark if nothing landed — otherwise one failed request leaves
-       the layer permanently empty. */
-    const loadLayerOnce = (key: string, url: string, transform: (d: any) => any) => {
-      if (layerFetchedRef.current.has(key)) return;
-      layerFetchedRef.current.add(key);
-      fetchEndpoint(url, transform).then(ok => {
-        if (!ok) layerFetchedRef.current.delete(key);
-      });
+    if (!layersRestored) return;
+    const load = (key: string, url: string, transform?: (d: any) => any) => {
+      layerLoaderRef.current?.load(key, () => fetchEndpoint(url, transform));
     };
-
-    // GDELT 2.0 geocoded events
-    if ((activeLayers as any).gdelt_events) {
-      loadLayerOnce('gdelt_events', '/api/gdelt-events?limit=600', d => ({ gdelt_events: d.events }));
+    if (activeLayers.flights || activeLayers.military || activeLayers.jets || activeLayers.private) {
+      load('flights', '/api/flights');
     }
-
-    // Cloudflare Radar — one request backs both layers
-    if ((activeLayers as any).cf_outages || (activeLayers as any).cf_attacks) {
-      loadLayerOnce('cloudflare_radar', '/api/cloudflare-radar', d => ({
-        cf_outages: d.outages ?? [],
-        cf_attack_origins: d.attack_origins ?? [],
-      }));
+    const anySatLayer = activeLayers.satellites || activeLayers.sat_comms || activeLayers.sat_military || activeLayers.sat_navigation || activeLayers.sat_earth || activeLayers.sat_science;
+    if (anySatLayer) load('satellites', '/api/satellites', d => ({ ...d, satellites_at: d.timestamp }));
+    if (activeLayers.fires) load('fires', '/api/fires');
+    if (activeLayers.maritime) load('maritime', '/api/maritime', d => ({ maritime_ports: d.ports, maritime_chokepoints: d.chokepoints, maritime_ships: d.ships }));
+    if (activeLayers.live_news) load('live_news', '/api/live-news', d => ({ live_feeds: d.feeds }));
+    if (activeLayers.weather) load('weather', '/api/weather', d => ({ weather_events: d.events }));
+    if (activeLayers.infrastructure) load('infrastructure', '/api/infrastructure', d => ({ infrastructure: d.infrastructure }));
+    if (activeLayers.global_incidents) load('gdelt', '/api/gdelt', d => ({ gdelt: d.events }));
+    if (activeLayers.cables) load('cables', '/data/submarine-cables.json', d => ({ submarine_cables: d.features }));
+    if (activeLayers.cyber_attacks) load('cyber_attacks', '/api/cyber-attacks', d => ({ cyber_attacks: d.attacks }));
+    if (activeLayers.gdelt_events) load('gdelt_events', '/api/gdelt-events?limit=600', d => ({ gdelt_events: d.events }));
+    if (activeLayers.cf_outages || activeLayers.cf_attacks) {
+      load('cloudflare_radar', '/api/cloudflare-radar', d => ({ cf_outages: d.outages ?? [], cf_attack_origins: d.attack_origins ?? [] }));
     }
-
-
-  }, [activeLayers]);
+  }, [layersRestored, activeLayers, fetchEndpoint]);
 
   // ── LAYER-AWARE POLLING — only poll data for active layers ──
   useEffect(() => {
@@ -768,20 +700,12 @@ export default function Dashboard() {
       intervals.push(setInterval(() => fetchEndpoint('/api/flights'), 300000)); // 5 min (was 2 min)
     }
 
-    if (activeLayers.balloons) {
-      intervals.push(setInterval(() => fetchEndpoint('/api/balloons', d => ({ balloons: d.balloons })), 300000)); // 5m
-    }
-    if (activeLayers.radiation) {
-      intervals.push(setInterval(() => fetchEndpoint('/api/radiation', d => ({ radiation: d.stations })), 300000)); // 5m
-    }
     if (activeLayers.maritime) {
       intervals.push(setInterval(() => fetchEndpoint('/api/maritime', d => ({ maritime_ports: d.ports, maritime_chokepoints: d.chokepoints, maritime_ships: d.ships })), 10000)); // 10s
     }
     if ((activeLayers as any).cyber_attacks) {
       intervals.push(setInterval(() => {
-        layerFetchedRef.current.delete('cyber_attacks');
         fetchEndpoint('/api/cyber-attacks', d => ({ cyber_attacks: d.attacks }));
-        layerFetchedRef.current.add('cyber_attacks');
       }, 10000)); // 10s — rapid refresh
     }
     return () => intervals.forEach(clearInterval);
@@ -853,9 +777,9 @@ export default function Dashboard() {
     return () => source.close();
   }, [activeLayers.malware]);
 
-  // CCTV: loaded once on layer toggle via layerFetchedRef (no viewport polling)
+  // CCTV: loaded once on layer toggle via the catalogue loader (no viewport polling)
 
-  // Reactive layer fetch: handled by layerFetchedRef above (no duplicate)
+  // Reactive layer fetch: handled by the layer loader above (no duplicate)
 
   // ── ŒIL DE DIEU SDK — Intelligence Fusion Layer ──
   // Produces node coordinates for the SDK network mesh visualization.
@@ -1491,6 +1415,10 @@ export default function Dashboard() {
           </AnimatePresence>
         </div>
 
+        <div className="relative">
+          <SharePanel mapView={mapView} activeLayers={activeLayers} />
+        </div>
+
         {/* Separator */}
         <div className="w-4 h-px bg-white/10 mx-auto" />
 
@@ -1742,7 +1670,7 @@ export default function Dashboard() {
                   {mobilePanel === 'search' && (
                     <div className="space-y-2">
                       <SearchBar onLocate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, zoom, ts: Date.now() }); setMobilePanel(null); }} />
-                      <SharePanel mapView={mapView} activeLayers={activeLayers} mouseCoords={null} />
+                      <SharePanel mapView={mapView} activeLayers={activeLayers} inline />
                     </div>
                   )}
                   {mobilePanel === 'recon' && (
@@ -1885,7 +1813,7 @@ export default function Dashboard() {
       <KeyboardShortcuts />
 
       {/* ── GLOBAL STATUS TICKER (bottom) ── */}
-      <GlobalStatusBar />
+      <GlobalStatusBar markets={data.markets} earthquakes={data.earthquakes} />
 
       {/* Shortcut hint — more visible */}
       <div className="desktop-only absolute bottom-[26px] right-5 z-[200] pointer-events-none text-[9px] font-mono text-[var(--text-muted)] opacity-50 tracking-widest" title="Press ? to see all keyboard shortcuts">

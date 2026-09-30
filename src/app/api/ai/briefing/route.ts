@@ -1,3 +1,4 @@
+import { getGeminiApiKeys } from '@/lib/ai-engine';
 /**
  * ═══════════════════════════════════════════════════════════════
  *  OSIRIS — AI Intelligence Briefing Endpoint
@@ -60,14 +61,7 @@ setInterval(() => {
    ───────────────────────────────────────────────────────────── */
 
 function getEnvApiKeys(): string[] {
-  const keys: string[] = [];
-  for (let i = 1; i <= 8; i++) {
-    const key = process.env[`GEMINI_API_KEY_${i}`];
-    if (key && key.trim().length > 0) {
-      keys.push(key.trim());
-    }
-  }
-  return keys;
+  return getGeminiApiKeys();
 }
 
 /* ─────────────────────────────────────────────────────────────
